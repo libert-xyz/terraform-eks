@@ -143,6 +143,25 @@ resource "aws_security_group_rule" "demo-cluster-ingress-workstation-https" {
   type              = "ingress"
 }
 
+##############
+##EKS MASTER##
+##############
+
+
+resource "aws_eks_cluster" "demo" {
+  name            = "${var.cluster-name}"
+  role_arn        = "${aws_iam_role.demo-node.arn}"
+
+  vpc_config {
+    security_group_ids = ["${aws_security_group.demo-cluster.id}"]
+    subnet_ids         = ["${aws_subnet.demo.*.id}"]
+  }
+
+  depends_on = [
+    "aws_iam_role_policy_attachment.demo-cluster-AmazonEKSClusterPolicy",
+    "aws_iam_role_policy_attachment.demo-cluster-AmazonEKSServicePolicy",
+  ]
+}
 
 # resource "aws_instance" "example" {
 #   ami           = "ami-b374d5a5"
