@@ -25,6 +25,10 @@ variable "cluster-name" {
  data "aws_availability_zones" "available" {
  }
 
+#######
+##VPC##
+#######
+
  resource "aws_vpc" "demo" {
    cidr_block = "10.0.0.0/16"
 
@@ -70,6 +74,75 @@ variable "cluster-name" {
    subnet_id      = aws_subnet.demo[count.index].id
    route_table_id = aws_route_table.demo.id
  }
+
+#####################
+###MASTER IAM ROLE###
+#####################
+
+resource "aws_iam_role" "demo-node" {
+  name = "terraform-eks-demo-cluster"
+
+  assume_role_policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "eks.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+POLICY
+}
+
+resource "aws_iam_role_policy_attachment" "demo-cluster-AmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = "${aws_iam_role.demo-node.name}"
+}
+
+resource "aws_iam_role_policy_attachment" "demo-cluster-AmazonEKSServicePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
+  role       = "${aws_iam_role.demo-node.name}"
+}
+
+
+###############
+###MASTER SG###
+###############
+
+resource "aws_security_group" "demo-cluster" {
+  name        = "terraform-eks-demo-cluster"
+  description = "Cluster communication with worker nodes"
+  vpc_id      = "${aws_vpc.demo.id}"
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "terraform-eks-demo"
+  }
+}
+
+# OPTIONAL: Allow inbound traffic from your local workstation external IP
+#           to the Kubernetes. You will need to replace A.B.C.D below with
+#           your real IP. Services like icanhazip.com can help you find this.
+resource "aws_security_group_rule" "demo-cluster-ingress-workstation-https" {
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "Allow workstation to communicate with the cluster API Server"
+  from_port         = 443
+  protocol          = "tcp"
+  security_group_id = "${aws_security_group.demo-cluster.id}"
+  to_port           = 443
+  type              = "ingress"
+}
+
 
 # resource "aws_instance" "example" {
 #   ami           = "ami-b374d5a5"
